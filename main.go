@@ -1,22 +1,66 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
+	"sync/atomic"
 )
+
+type apiConfig struct {
+	fileserverHits atomic.Int32
+}
+
+func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cfg.fileserverHits.Add(1)
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (cfg *apiConfig) getFileServerHits() int32 {
+	return cfg.fileserverHits.Load()
+}
+
+func (cfg *apiConfig) resetFileServerHits() {
+	cfg.fileserverHits.Swap(0)
+}
 
 func main() {
 	port := "8080"
 	filepathRoot := "."
+	apiCfg := apiConfig{}
 
 	mux := http.NewServeMux()
 
-	mux.Handle("/app/", http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot))))
+	mux.Handle(
+		"/app/",
+		apiCfg.middlewareMetricsInc(
+			http.StripPrefix(
+				"/app",
+				http.FileServer(http.Dir(filepathRoot)))))
 
 	mux.HandleFunc("/healthz", func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "text/plain; charset=utf-8") // normal header
 		writer.WriteHeader(http.StatusOK)
 		writer.Write([]byte("OK"))
+	})
+
+	mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8") // normal header
+		w.WriteHeader(http.StatusOK)
+
+		response := fmt.Sprintf("Hits: %d", apiCfg.getFileServerHits())
+		w.Write([]byte(response))
+	})
+
+	mux.HandleFunc("/reset", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8") // normal header
+		w.WriteHeader(http.StatusOK)
+
+		// response := fmt.Sprintf("Hits: %d", apiCfg.getFileServerHits())
+		apiCfg.resetFileServerHits()
+		w.Write([]byte("Hits reset"))
 	})
 
 	server := &http.Server{
