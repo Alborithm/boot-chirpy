@@ -40,21 +40,21 @@ func main() {
 				"/app",
 				http.FileServer(http.Dir(filepathRoot)))))
 
-	mux.HandleFunc("/healthz", func(writer http.ResponseWriter, request *http.Request) {
+	mux.HandleFunc("GET /api/healthz", func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "text/plain; charset=utf-8") // normal header
 		writer.WriteHeader(http.StatusOK)
 		writer.Write([]byte("OK"))
 	})
 
-	mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8") // normal header
+	mux.HandleFunc("GET /admin/metrics", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8") // normal header
 		w.WriteHeader(http.StatusOK)
 
-		response := fmt.Sprintf("Hits: %d", apiCfg.getFileServerHits())
+		response := fmt.Sprintf("<html><body><h1>Welcome, Chirpy Admin</h1><p>Chirpy has been visited %d times!</p></body></html>", apiCfg.getFileServerHits())
 		w.Write([]byte(response))
 	})
 
-	mux.HandleFunc("/reset", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /admin/reset", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8") // normal header
 		w.WriteHeader(http.StatusOK)
 
