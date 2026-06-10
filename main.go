@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"sync/atomic"
 )
 
@@ -75,7 +76,7 @@ func main() {
 		}
 
 		type responseBody struct {
-			Valid bool `json:"valid"`
+			CleanedBody string `json:"cleaned_body"`
 		}
 		w.Header().Set("Content-Type", "application/json")
 
@@ -114,8 +115,23 @@ func main() {
 			return
 		}
 
+		// Cleane the input
+
+		words := strings.Split(chirp.Body, " ")
+
+		badWords := map[string]struct{}{
+			"kerfuffle": {},
+			"sharbert":  {},
+			"fornax":    {},
+		}
+		for i, word := range words {
+			if _, ok := badWords[strings.ToLower(word)]; ok {
+				words[i] = "****"
+			}
+		}
+
 		validResponse := responseBody{
-			Valid: true,
+			CleanedBody: strings.Join(words, " "),
 		}
 
 		dat, err := json.Marshal(validResponse)
