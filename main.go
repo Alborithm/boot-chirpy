@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -61,6 +62,69 @@ func main() {
 		// response := fmt.Sprintf("Hits: %d", apiCfg.getFileServerHits())
 		apiCfg.resetFileServerHits()
 		w.Write([]byte("Hits reset"))
+	})
+
+	// POST /api/validate_chirp
+	mux.HandleFunc("POST /api/validate_chirp", func(w http.ResponseWriter, r *http.Request) {
+		type chirpPost struct {
+			Body string `json:"body"`
+		}
+
+		type errorBody struct {
+			Error string `json:"error"`
+		}
+
+		type responseBody struct {
+			Valid bool `json:"valid"`
+		}
+		w.Header().Set("Content-Type", "application/json")
+
+		decoder := json.NewDecoder(r.Body)
+		chirp := chirpPost{}
+		err := decoder.Decode(&chirp)
+		if err != nil || chirp.Body == "" {
+			w.WriteHeader(500)
+
+			errorResponse := errorBody{
+				Error: "Something went wrong",
+			}
+
+			dat, err := json.Marshal(errorResponse)
+			if err != nil {
+				return
+			}
+			w.Write(dat)
+			return
+		}
+
+		// Long chirp check
+		if len(chirp.Body) > 140 {
+			w.WriteHeader(400)
+
+			errorResponse := errorBody{
+				Error: "Chirp is too long",
+			}
+
+			dat, err := json.Marshal(errorResponse)
+			if err != nil {
+				return
+			}
+
+			w.Write(dat)
+			return
+		}
+
+		validResponse := responseBody{
+			Valid: true,
+		}
+
+		dat, err := json.Marshal(validResponse)
+		if err != nil {
+			w.WriteHeader(500)
+			return
+		}
+		w.WriteHeader(200)
+		w.Write(dat)
 	})
 
 	server := &http.Server{
