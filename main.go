@@ -18,6 +18,7 @@ import (
 
 type apiConfig struct {
 	fileserverHits atomic.Int32
+	db             *database.Queries
 }
 
 func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
@@ -36,22 +37,22 @@ func (cfg *apiConfig) resetFileServerHits() {
 }
 
 func main() {
-	port := "8080"
-	filepathRoot := "."
+	const port = "8080"
+	const filepathRoot = "."
 	apiCfg := apiConfig{}
-
-	dbURL := os.Getenv("DB_URL")
 
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
-	db, err := sql.Open("postgres", dbURL)
+
+	dbURL := os.Getenv("DB_URL")
+
+	dbConn, err := sql.Open("postgres", dbURL)
 	if err != nil {
 		log.Fatal("Error opening postgresql connection")
 	}
-
-	_ = database.New(db)
+	apiCfg.db = database.New(dbConn)
 
 	mux := http.NewServeMux()
 
@@ -161,6 +162,38 @@ func main() {
 		}
 		w.WriteHeader(200)
 		w.Write(dat)
+	})
+
+	mux.HandleFunc("POST /api/users", func(w http.ResponseWriter, r *http.Request) {
+		type userRequest struct {
+			Email string `json:"email"`
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+
+		decoder := json.NewDecoder(r.Body)
+		userReq := userRequest{}
+		err = decoder.Decode(&userReq)
+		if err != nil || userReq.Email == "" {
+			w.WriteHeader(500)
+			return
+		}
+
+		usr, err := apiCfg.db.CreateUser(r.Context(), userReq.Email)
+		if err != nil {
+			w.WriteHeader(500)
+			log.Fatal(err)
+			return
+		}
+
+		jsonData, err := json.Marshal(usr)
+		if err != nil {
+			w.WriteHeader(500)
+			return
+		}
+
+		w.WriteHeader(201)
+		w.Write(jsonData)
 	})
 
 	server := &http.Server{
