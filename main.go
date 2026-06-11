@@ -1,12 +1,19 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"sync/atomic"
+
+	"github.com/alborithm/boot-chirpy/internal/database"
+	"github.com/joho/godotenv"
+
+	_ "github.com/lib/pq"
 )
 
 type apiConfig struct {
@@ -32,6 +39,19 @@ func main() {
 	port := "8080"
 	filepathRoot := "."
 	apiCfg := apiConfig{}
+
+	dbURL := os.Getenv("DB_URL")
+
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+	db, err := sql.Open("postgres", dbURL)
+	if err != nil {
+		log.Fatal("Error opening postgresql connection")
+	}
+
+	_ = database.New(db)
 
 	mux := http.NewServeMux()
 
