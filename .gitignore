@@ -1,0 +1,5 @@
+# Ignore any file ending with .env in the root directory
+*.env
+
+# Ignore all files ending with .env in any directory
+**/*.env
