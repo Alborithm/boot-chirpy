@@ -9,8 +9,10 @@ import (
 	"os"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"github.com/alborithm/boot-chirpy/internal/database"
+	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 
 	_ "github.com/lib/pq"
@@ -19,6 +21,14 @@ import (
 type apiConfig struct {
 	fileserverHits atomic.Int32
 	db             *database.Queries
+	platform       string
+}
+
+type User struct {
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Email     string    `json:"email"`
 }
 
 func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
@@ -53,6 +63,7 @@ func main() {
 		log.Fatal("Error opening postgresql connection")
 	}
 	apiCfg.db = database.New(dbConn)
+	apiCfg.platform = os.Getenv("PLATFORM")
 
 	mux := http.NewServeMux()
 
@@ -79,13 +90,20 @@ func main() {
 
 	mux.HandleFunc("POST /admin/reset", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8") // normal header
-		w.WriteHeader(http.StatusOK)
+		if apiCfg.platform != "dev" {
+			w.WriteHeader(403)
+			return
+		}
 
 		// response := fmt.Sprintf("Hits: %d", apiCfg.getFileServerHits())
 		apiCfg.resetFileServerHits()
 
-		apiCfg.db.DeleteUsers(r.Context())
+		if err := apiCfg.db.DeleteUsers(r.Context()); err != nil {
+			w.WriteHeader(500)
+			return
+		}
 
+		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("Hits reset"))
 	})
 
@@ -182,11 +200,18 @@ func main() {
 			return
 		}
 
-		usr, err := apiCfg.db.CreateUser(r.Context(), userReq.Email)
+		response, err := apiCfg.db.CreateUser(r.Context(), userReq.Email)
 		if err != nil {
 			w.WriteHeader(500)
 			log.Fatal(err)
 			return
+		}
+
+		usr := User{
+			ID:        response.ID,
+			CreatedAt: response.CreatedAt,
+			UpdatedAt: response.UpdatedAt,
+			Email:     response.Email,
 		}
 
 		jsonData, err := json.Marshal(usr)
