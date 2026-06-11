@@ -83,6 +83,9 @@ func main() {
 
 		// response := fmt.Sprintf("Hits: %d", apiCfg.getFileServerHits())
 		apiCfg.resetFileServerHits()
+
+		apiCfg.db.DeleteUsers(r.Context())
+
 		w.Write([]byte("Hits reset"))
 	})
 
