@@ -195,6 +195,8 @@ func main() {
 		w.Write(dat)
 	})
 
+	mux.HandleFunc("GET /api/chirps", apiCfg.handlerChirpsGetAll)
+
 	mux.HandleFunc("POST /api/users", func(w http.ResponseWriter, r *http.Request) {
 		type userRequest struct {
 			Email string `json:"email"`
