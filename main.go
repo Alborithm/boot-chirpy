@@ -50,10 +50,6 @@ func (cfg *apiConfig) getFileServerHits() int32 {
 	return cfg.fileserverHits.Load()
 }
 
-func (cfg *apiConfig) resetFileServerHits() {
-	cfg.fileserverHits.Swap(0)
-}
-
 func main() {
 	const port = "8080"
 	const filepathRoot = "."
@@ -96,26 +92,7 @@ func main() {
 		w.Write([]byte(response))
 	})
 
-	mux.HandleFunc("POST /admin/reset", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8") // normal header
-		if apiCfg.platform != "dev" {
-			w.WriteHeader(403)
-			w.Write([]byte("Not in dev platform"))
-			return
-		}
-
-		// response := fmt.Sprintf("Hits: %d", apiCfg.getFileServerHits())
-		apiCfg.resetFileServerHits()
-
-		if err := apiCfg.db.DeleteUsers(r.Context()); err != nil {
-			w.WriteHeader(500)
-			w.Write([]byte(err.Error()))
-			return
-		}
-
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Hits reset"))
-	})
+	mux.HandleFunc("POST /admin/reset", apiCfg.handlerReset)
 
 	// POST /api/chirps
 	mux.HandleFunc("POST /api/chirps", func(w http.ResponseWriter, r *http.Request) {
