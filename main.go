@@ -31,6 +31,14 @@ type User struct {
 	Email     string    `json:"email"`
 }
 
+type Chirp struct {
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Body      string    `json:"body"`
+	UserID    uuid.UUID `json:"user_id"`
+}
+
 func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cfg.fileserverHits.Add(1)
@@ -92,6 +100,7 @@ func main() {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8") // normal header
 		if apiCfg.platform != "dev" {
 			w.WriteHeader(403)
+			w.Write([]byte("Not in dev platform"))
 			return
 		}
 
@@ -100,6 +109,7 @@ func main() {
 
 		if err := apiCfg.db.DeleteUsers(r.Context()); err != nil {
 			w.WriteHeader(500)
+			w.Write([]byte(err.Error()))
 			return
 		}
 
@@ -107,19 +117,17 @@ func main() {
 		w.Write([]byte("Hits reset"))
 	})
 
-	// POST /api/validate_chirp
-	mux.HandleFunc("POST /api/validate_chirp", func(w http.ResponseWriter, r *http.Request) {
+	// POST /api/chirps
+	mux.HandleFunc("POST /api/chirps", func(w http.ResponseWriter, r *http.Request) {
 		type chirpPost struct {
-			Body string `json:"body"`
+			Body   string    `json:"body"`
+			UserID uuid.UUID `json:"user_id"`
 		}
 
 		type errorBody struct {
 			Error string `json:"error"`
 		}
 
-		type responseBody struct {
-			CleanedBody string `json:"cleaned_body"`
-		}
 		w.Header().Set("Content-Type", "application/json")
 
 		decoder := json.NewDecoder(r.Body)
@@ -172,16 +180,41 @@ func main() {
 			}
 		}
 
-		validResponse := responseBody{
-			CleanedBody: strings.Join(words, " "),
+		chirpRequest := database.CreateChirpParams{
+			Body:   strings.Join(words, " "),
+			UserID: chirp.UserID,
 		}
 
-		dat, err := json.Marshal(validResponse)
+		response, err := apiCfg.db.CreateChirp(r.Context(), chirpRequest)
+		if err != nil {
+			w.WriteHeader(500)
+			errorResponse := errorBody{
+				Error: "Error inserting chirp",
+			}
+
+			dat, err := json.Marshal(errorResponse)
+			if err != nil {
+				return
+			}
+
+			w.Write(dat)
+			return
+		}
+
+		newChirp := Chirp{
+			ID:        response.ID,
+			CreatedAt: response.CreatedAt,
+			UpdatedAt: response.UpdatedAt,
+			Body:      response.Body,
+			UserID:    response.UserID,
+		}
+
+		dat, err := json.Marshal(newChirp)
 		if err != nil {
 			w.WriteHeader(500)
 			return
 		}
-		w.WriteHeader(200)
+		w.WriteHeader(201)
 		w.Write(dat)
 	})
 
