@@ -197,44 +197,7 @@ func main() {
 
 	mux.HandleFunc("GET /api/chirps", apiCfg.handlerChirpsGetAll)
 
-	mux.HandleFunc("POST /api/users", func(w http.ResponseWriter, r *http.Request) {
-		type userRequest struct {
-			Email string `json:"email"`
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-
-		decoder := json.NewDecoder(r.Body)
-		userReq := userRequest{}
-		err = decoder.Decode(&userReq)
-		if err != nil || userReq.Email == "" {
-			w.WriteHeader(500)
-			return
-		}
-
-		response, err := apiCfg.db.CreateUser(r.Context(), userReq.Email)
-		if err != nil {
-			w.WriteHeader(500)
-			log.Fatal(err)
-			return
-		}
-
-		usr := User{
-			ID:        response.ID,
-			CreatedAt: response.CreatedAt,
-			UpdatedAt: response.UpdatedAt,
-			Email:     response.Email,
-		}
-
-		jsonData, err := json.Marshal(usr)
-		if err != nil {
-			w.WriteHeader(500)
-			return
-		}
-
-		w.WriteHeader(201)
-		w.Write(jsonData)
-	})
+	mux.HandleFunc("POST /api/users", apiCfg.HandlerUsersCreate)
 
 	mux.HandleFunc("GET /api/chirps/{chirpID}", apiCfg.handlerChirpsGetByID)
 
