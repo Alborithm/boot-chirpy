@@ -236,6 +236,8 @@ func main() {
 		w.Write(jsonData)
 	})
 
+	mux.HandleFunc("GET /api/chirps/{chirpID}", apiCfg.handlerChirpsGetByID)
+
 	server := &http.Server{
 		Handler: mux,
 		Addr:    ":" + port,
