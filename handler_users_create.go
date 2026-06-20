@@ -32,8 +32,8 @@ func (cfg *apiConfig) HandlerUsersCreate(w http.ResponseWriter, r *http.Request)
 	}
 
 	response, err := cfg.db.CreateUser(r.Context(), database.CreateUserParams{
-		Email:    userReq.Email,
-		Password: hashedPassword,
+		Email:          userReq.Email,
+		HashedPassword: hashedPassword,
 	})
 
 	if err != nil {
