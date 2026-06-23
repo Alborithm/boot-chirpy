@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"net/http"
 	"testing"
 )
 
@@ -63,6 +64,60 @@ func TestCheckPasswordHash(t *testing.T) {
 			}
 			if !tt.wantErr && match != tt.matchPassword {
 				t.Errorf("CheckPasswordHash() expects %v, got %v", tt.matchPassword, match)
+			}
+		})
+	}
+}
+
+func TestGetBearerToken(t *testing.T) {
+	// first we need to create a header
+	w := http.Header{}
+	w.Set("Authorization", "Bearer MY_TOKEN_STRING")
+
+	tests := []struct {
+		name      string
+		header    http.Header
+		wantErr   bool
+		wantToken string
+	}{
+		{
+			name:      "Valid header",
+			header:    http.Header{},
+			wantErr:   false,
+			wantToken: "MY_TOKEN_STRING",
+		},
+		{
+			name:      "Invalid header key",
+			header:    http.Header{},
+			wantErr:   true,
+			wantToken: "",
+		},
+		{
+			name:      "Invalid header value",
+			header:    http.Header{},
+			wantErr:   true,
+			wantToken: "",
+		},
+		{
+			name:      "No authorization header",
+			header:    http.Header{},
+			wantErr:   true,
+			wantToken: "",
+		},
+	}
+
+	tests[0].header.Set("Authorization", "Bearer MY_TOKEN_STRING")
+	tests[1].header.Set("Authorizatio", "Bearer MY_TOKEN_STRING")
+	tests[2].header.Set("Authorization", "Bearers MY_TOKEN_STRING")
+	// do different scenarios for valid header and non valid,
+	// bad written and empty
+
+	// run the test for valid should get a token string and no error
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tokenString, err := GetBearerToken(tt.header)
+			if !tt.wantErr && tokenString != "MY_TOKEN_STRING" && err != nil {
+				t.Errorf("GetBearerToken() error= %v", err)
 			}
 		})
 	}

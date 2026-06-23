@@ -1,6 +1,12 @@
 package auth
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+	"errors"
+	"net/http"
+	"strings"
+
 	"github.com/alexedwards/argon2id"
 )
 
@@ -20,4 +26,26 @@ func CheckPasswordHash(password, hash string) (bool, error) {
 	}
 
 	return match, nil
+}
+
+func GetBearerToken(headers http.Header) (string, error) {
+	tokenString := headers.Get("Authorization")
+
+	if tokenString == "" {
+		return "", errors.New("No header Authorization found")
+	}
+
+	tokenString, found := strings.CutPrefix(tokenString, "Bearer ")
+
+	if !found {
+		return "", errors.New("Authorization not prefixed wiht 'Bearer '")
+	}
+
+	return tokenString, nil
+}
+
+func MakeRefreshToken() string {
+	key := make([]byte, 32)
+	rand.Read(key)
+	return hex.EncodeToString(key)
 }

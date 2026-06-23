@@ -2,12 +2,10 @@ package main
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -22,13 +20,16 @@ type apiConfig struct {
 	fileserverHits atomic.Int32
 	db             *database.Queries
 	platform       string
+	jwtSecret      string
 }
 
 type User struct {
-	ID        uuid.UUID `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	Email     string    `json:"email"`
+	ID           uuid.UUID `json:"id"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+	Email        string    `json:"email"`
+	Token        string    `json:"token"`
+	RefreshToken string    `json:"refresh_token"`
 }
 
 type Chirp struct {
@@ -69,6 +70,8 @@ func main() {
 	apiCfg.db = database.New(dbConn)
 	apiCfg.platform = os.Getenv("PLATFORM")
 
+	apiCfg.jwtSecret = os.Getenv("JWT_SECRET")
+
 	mux := http.NewServeMux()
 
 	mux.Handle(
@@ -95,111 +98,13 @@ func main() {
 	mux.HandleFunc("POST /admin/reset", apiCfg.handlerReset)
 
 	// POST /api/chirps
-	mux.HandleFunc("POST /api/chirps", func(w http.ResponseWriter, r *http.Request) {
-		type chirpPost struct {
-			Body   string    `json:"body"`
-			UserID uuid.UUID `json:"user_id"`
-		}
-
-		type errorBody struct {
-			Error string `json:"error"`
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-
-		decoder := json.NewDecoder(r.Body)
-		chirp := chirpPost{}
-		err := decoder.Decode(&chirp)
-		if err != nil || chirp.Body == "" {
-			w.WriteHeader(500)
-
-			errorResponse := errorBody{
-				Error: "Something went wrong",
-			}
-
-			dat, err := json.Marshal(errorResponse)
-			if err != nil {
-				return
-			}
-			w.Write(dat)
-			return
-		}
-
-		// Long chirp check
-		if len(chirp.Body) > 140 {
-			w.WriteHeader(400)
-
-			errorResponse := errorBody{
-				Error: "Chirp is too long",
-			}
-
-			dat, err := json.Marshal(errorResponse)
-			if err != nil {
-				return
-			}
-
-			w.Write(dat)
-			return
-		}
-
-		// Cleane the input
-
-		words := strings.Split(chirp.Body, " ")
-
-		badWords := map[string]struct{}{
-			"kerfuffle": {},
-			"sharbert":  {},
-			"fornax":    {},
-		}
-		for i, word := range words {
-			if _, ok := badWords[strings.ToLower(word)]; ok {
-				words[i] = "****"
-			}
-		}
-
-		chirpRequest := database.CreateChirpParams{
-			Body:   strings.Join(words, " "),
-			UserID: chirp.UserID,
-		}
-
-		response, err := apiCfg.db.CreateChirp(r.Context(), chirpRequest)
-		if err != nil {
-			w.WriteHeader(500)
-			errorResponse := errorBody{
-				Error: "Error inserting chirp",
-			}
-
-			dat, err := json.Marshal(errorResponse)
-			if err != nil {
-				return
-			}
-
-			w.Write(dat)
-			return
-		}
-
-		newChirp := Chirp{
-			ID:        response.ID,
-			CreatedAt: response.CreatedAt,
-			UpdatedAt: response.UpdatedAt,
-			Body:      response.Body,
-			UserID:    response.UserID,
-		}
-
-		dat, err := json.Marshal(newChirp)
-		if err != nil {
-			w.WriteHeader(500)
-			return
-		}
-		w.WriteHeader(201)
-		w.Write(dat)
-	})
+	mux.HandleFunc("POST /api/chirps", apiCfg.handlerChirpsPost)
 
 	mux.HandleFunc("GET /api/chirps", apiCfg.handlerChirpsGetAll)
 
 	mux.HandleFunc("POST /api/users", apiCfg.HandlerUsersCreate)
 
-	mux.HandleFunc("POST /api/login", apiCfg.HandlerUserLogin)
+	mux.HandleFunc("POST /api/login", apiCfg.handlerUserLogin)
 
 	mux.HandleFunc("GET /api/chirps/{chirpID}", apiCfg.handlerChirpsGetByID)
 
