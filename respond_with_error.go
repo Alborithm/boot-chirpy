@@ -21,5 +21,4 @@ func respondWithError(w http.ResponseWriter, r *http.Request, statusCode int, me
 		return
 	}
 	w.Write(dat)
-	return
 }

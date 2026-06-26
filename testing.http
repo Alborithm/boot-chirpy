@@ -43,3 +43,12 @@ GET http://localhost:8080/api/chirps HTTP/1.1
 
 ###
 GET http://localhost:8080/api/chirps/2afb4b9f-7fc9-4af2-9dc1-b679be121f58 HTTP/1.1
+
+###
+PUT http://localhost:8080/api/users HTTP/1.1
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJjaGlycHktYWNjZXNzIiwic3ViIjoiZDRkOTQwOWYtYzc4YS00MWJkLWExNDUtYWFhMzVmZTY2ZTBkIiwiZXhwIjoxNzgyMjU4OTYzLCJpYXQiOjE3ODIyNTUzNjN9.DLW1YurwgX6NK_mkd9KrbxE0p5pn-3iAjPA1N2sb-yA
+
+{
+    "email": "tesst@email.com",
+    "password": "strongopass"
+}

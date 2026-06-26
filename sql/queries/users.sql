@@ -15,3 +15,18 @@ TRUNCATE TABLE users CASCADE;
 -- name: GetUserByEmail :one
 SELECT * FROM users
 WHERE email = $1;
+
+-- name: UpdatePassword :one
+UPDATE users
+SET email = $1,
+hashed_password = $2,
+updated_at = Now()
+WHERE id = $3
+RETURNING *;
+
+-- name: UpgradeUserChirpyRed :one
+UPDATE users
+SET is_chirpy_red = true,
+updated_at = NOW()
+WHERE id = $1
+RETURNING *;
